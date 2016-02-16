@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# enable/disable touchpad
+#
+# Based on xero script <code.xero.nu>
+
+PAD=$(awk -F '"' '/synap|alps|etps/ {print $2}' IGNORECASE=1 \
+      /proc/bus/input/devices)
+A=$(xinput list-props "$PAD" | awk -F ':' '/Device Enabled/ {print $2}')
+
+if [ $A -eq 1 ]; then
+	xinput set-int-prop "$PAD" "Device Enabled" 8 0
+	echo "touchpad: disabled"
+else
+	xinput set-int-prop "$PAD" "Device Enabled" 8 1
+	echo "touchpad: enabled"
+fi

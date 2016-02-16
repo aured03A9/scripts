@@ -1,0 +1,87 @@
+#!/bin/sh
+#
+# Copyright (c) 2016 aujecied <ajcd+prj@opmbx.org>
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+TODO_FILE=$HOME/.todo
+TMP_FILE=/tmp/todofile
+
+add() {
+    shift
+    echo "$*" >> $TODO_FILE
+}
+
+delete() {
+    awk -v nb=$1 'NR==nb {next} {print}' $TODO_FILE > $TMP_FILE
+    mv $TMP_FILE $TODO_FILE
+}
+
+edit() {
+    nb=$2
+    shift 2
+    [ $# -gt 0 ] || usage
+    awk -v nb=$nb -v str="$*" 'NR==nb {$0=str} {print}' $TODO_FILE > $TMP_FILE
+    mv $TMP_FILE $TODO_FILE
+}
+
+list() {
+    echo ""
+    echo "                    TODO"
+    echo "      <<---------------------------->>"
+    echo ""
+    nl -b a $TODO_FILE
+    echo ""
+}
+
+loop() {
+    while true; do
+        clear
+        list
+        sleep 5
+    done
+}
+
+purge() {
+    echo -n "Purge todo file? [no] "
+    read a
+    if [ "$a" == "yes" ] || [ "$a" == "y" ]; then
+        > $TODO_FILE
+        echo "Todo file purged!"
+    fi
+}
+
+usage() {
+    echo "usage: todo [-clp]"
+    echo "       todo -a string"
+    echo "       todo -d line_number"
+    echo "       todo -e line_number string"
+    exit 1
+}
+
+[ -f "$TODO_FILE" ] || touch $TODO_FILE
+[ $# -gt 0 ] || list
+
+while getopts "a:cd:e:lp" opt; do
+    case $opt in
+        a) add $* ;;
+        c) clear && list ;;
+        d) delete $2 ;;
+        e) edit $* ;;
+        l) loop ;;
+        p) purge ;;
+        *) usage ;;
+    esac
+done
+
+exit 0
