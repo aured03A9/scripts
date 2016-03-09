@@ -55,10 +55,12 @@ loop() {
 purge() {
     echo -n "Purge todo file? [no] "
     read a
-    if [ "$a" == "yes" ] || [ "$a" == "y" ]; then
-        > $TODO_FILE
-        echo "Todo file purged!"
-    fi
+    case $a in
+        y|yes)
+            :> $TODO_FILE
+            echo "Todo file purged!"
+            ;;
+    esac
 }
 
 usage() {
@@ -76,7 +78,7 @@ while getopts "a:cd:e:lp" opt; do
     case $opt in
         a) add $* ;;
         c) clear && list ;;
-        d) delete $2 ;;
+        d) delete $OPTARG ;;
         e) edit $* ;;
         l) loop ;;
         p) purge ;;
