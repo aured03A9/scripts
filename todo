@@ -18,21 +18,37 @@ TODO_FILE=$HOME/.todo
 TMP_FILE=/tmp/todofile
 
 add() {
-    shift
-    echo "$*" >> $TODO_FILE
+    new
+    _nb_item=$
+    _mode=a
+    write
 }
 
-delete() {
-    awk -v nb=$1 'NR==nb {next} {print}' $TODO_FILE > $TMP_FILE
-    mv $TMP_FILE $TODO_FILE
+del() {
+    item
+    echo "${_nb_item}  ${_item}"
+    echo -n "Remove item ${_nb_item}? [no] "
+    read _answer
+    case ${_answer} in
+        y|yes)
+            _mode=d
+            write
+            ;;
+    esac
 }
 
 edit() {
-    nb=$2
-    shift 2
-    [ $# -gt 0 ] || usage
-    awk -v nb=$nb -v str="$*" 'NR==nb {$0=str} {print}' $TODO_FILE > $TMP_FILE
-    mv $TMP_FILE $TODO_FILE
+    item
+    echo "Old item: ${_item}"
+    new
+    _mode=c
+    write
+}
+
+item() {
+    _nb_item=${OPTARG}
+    _item=$(sed -n "${_nb_item}p" ${TODO_FILE})
+    void "${_item}"
 }
 
 list() {
@@ -40,7 +56,7 @@ list() {
     echo "                    TODO"
     echo "      <<---------------------------->>"
     echo ""
-    nl -b a $TODO_FILE
+    nl -b a ${TODO_FILE}
     echo ""
 }
 
@@ -52,38 +68,55 @@ loop() {
     done
 }
 
+new() {
+    echo -n "New item: "
+    read _new_item
+    void "${_new_item}"
+}
+
 purge() {
     echo -n "Purge todo file? [no] "
-    read a
-    case $a in
+    read _answer
+    case ${_answer} in
         y|yes)
-            :> $TODO_FILE
+            :> ${TODO_FILE}
             echo "Todo file purged!"
             ;;
     esac
 }
 
 usage() {
-    echo "usage: todo [-clp]"
-    echo "       todo -a string"
-    echo "       todo -d line_number"
-    echo "       todo -e line_number string"
+    echo "usage: todo [-achlP] [-d line_number] [-e line_number]"
     exit 1
 }
 
-[ -f "$TODO_FILE" ] || touch $TODO_FILE
-[ $# -gt 0 ] || list
+void() {
+    if [ -z "${1}" ]; then
+        exit 1
+    fi
+}
 
-while getopts "a:cd:e:lp" opt; do
-    case $opt in
-        a) add $* ;;
+write() {
+    if [ -s "${TODO_FILE}" ]; then
+        sed -e "${_nb_item} ${_mode} ${_new_item}" ${TODO_FILE} > ${TMP_FILE}
+        mv ${TMP_FILE} ${TODO_FILE}
+    else
+        echo "${_new_item}" > ${TODO_FILE}
+    fi
+}
+
+[ -f "${TODO_FILE}" ] || touch ${TODO_FILE}
+while getopts "acd:e:hlP" _opt; do
+    case ${_opt} in
+        a) add ;;
         c) clear && list ;;
-        d) delete $OPTARG ;;
-        e) edit $* ;;
+        d) del ;;
+        e) edit ;;
         l) loop ;;
-        p) purge ;;
+        P) purge ;;
         *) usage ;;
     esac
 done
+[ ${#} -eq 0 ] && list
 
 exit 0
