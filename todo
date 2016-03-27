@@ -14,67 +14,61 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-TODO_FILE=$HOME/.todo
-TMP_FILE=/tmp/todofile
+TODO_FILE="$HOME/.todo"
+TMP_FILE="/tmp/todofile"
+INTERVAL=10
 
-add() {
-    new
-    _nb_item=$
-    _mode=a
-    write
+item_append() {
+    _mode='a'
+    _nb_item='$'
+    item_new
+    item_write
 }
 
-del() {
-    item
+item_delete() {
+    _mode='d'
+    item_view
     echo "${_nb_item}  ${_item}"
     echo -n "Remove item ${_nb_item}? [no] "
     read _answer
     case ${_answer} in
         y|yes)
-            _mode=d
-            write
+            item_write
             ;;
     esac
 }
 
-edit() {
-    item
+item_edit() {
+    _mode='c'
+    item_view
     echo "Old item: ${_item}"
-    new
-    _mode=c
-    write
+    item_new
+    item_write
 }
 
-item() {
-    _nb_item=${OPTARG}
-    _item=$(sed -n "${_nb_item}p" ${TODO_FILE})
-    void "${_item}"
+item_empty() {
+    [ -z "${1}" ] && exit 1
 }
 
-list() {
-    echo ""
-    echo "                    TODO"
-    echo "      <<---------------------------->>"
-    echo ""
-    nl -b a ${TODO_FILE}
-    echo ""
+item_insert() {
+    _mode='i'
+    item_number
+    item_new
+    item_write
 }
 
-loop() {
-    while true; do
-        clear
-        list
-        sleep 5
-    done
-}
-
-new() {
+item_new() {
     echo -n "New item: "
     read _new_item
-    void "${_new_item}"
+    item_empty "${_new_item}"
 }
 
-purge() {
+item_number() {
+    _nb_item=${OPTARG}
+    [ ${_nb_item} -gt 0 ] || exit 1
+}
+
+item_purge() {
     echo -n "Purge todo file? [no] "
     read _answer
     case ${_answer} in
@@ -85,18 +79,13 @@ purge() {
     esac
 }
 
-usage() {
-    echo "usage: todo [-achlP] [-d line_number] [-e line_number]"
-    exit 1
+item_view() {
+    item_number
+    _item=$(sed -n "${_nb_item}p" ${TODO_FILE})
+    item_empty "${_item}"
 }
 
-void() {
-    if [ -z "${1}" ]; then
-        exit 1
-    fi
-}
-
-write() {
+item_write() {
     if [ -s "${TODO_FILE}" ]; then
         sed -e "${_nb_item} ${_mode} ${_new_item}" ${TODO_FILE} > ${TMP_FILE}
         mv ${TMP_FILE} ${TODO_FILE}
@@ -105,18 +94,43 @@ write() {
     fi
 }
 
+todo_list() {
+    echo ""
+    echo "                    TODO"
+    echo "      <<---------------------------->>"
+    echo ""
+    nl -b a ${TODO_FILE}
+    echo ""
+}
+
+todo_loop() {
+    while true; do
+        clear
+        todo_list
+        sleep ${INTERVAL}
+    done
+}
+
+usage() {
+    echo "usage: todo [-achlPs] [-d line_number] [-e line_number] \
+[ -i line_number]"
+    exit 1
+}
+
 [ -f "${TODO_FILE}" ] || touch ${TODO_FILE}
-while getopts "acd:e:hlP" _opt; do
+while getopts "acd:e:hi:lPs" _opt; do
     case ${_opt} in
-        a) add ;;
-        c) clear && list ;;
-        d) del ;;
-        e) edit ;;
-        l) loop ;;
-        P) purge ;;
+        a) item_append ;;
+        c) clear && todo_list ;;
+        d) item_delete ;;
+        e) item_edit ;;
+        i) item_insert ;;
+        l) todo_loop ;;
+        P) item_purge ;;
+        s) todo_list ;;
         *) usage ;;
     esac
 done
-[ ${#} -eq 0 ] && list
+[ ${#} -eq 0 ] && todo_list
 
 exit 0
