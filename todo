@@ -65,7 +65,11 @@ item_new() {
 
 item_number() {
     _nb_item=${OPTARG}
-    [ ${_nb_item} -gt 0 ] || exit 1
+    case ${_nb_item} in
+        ''|*[!0-9]*)
+            exit 1
+            ;;
+    esac
 }
 
 item_purge() {
@@ -73,7 +77,7 @@ item_purge() {
     read _answer
     case ${_answer} in
         y|yes)
-            :> ${TODO_FILE}
+            : > ${TODO_FILE}
             echo "Todo file purged!"
             ;;
     esac
@@ -87,10 +91,11 @@ item_view() {
 
 item_write() {
     if [ -s "${TODO_FILE}" ]; then
-        sed -e "${_nb_item} ${_mode} ${_new_item}" ${TODO_FILE} > ${TMP_FILE}
-        mv ${TMP_FILE} ${TODO_FILE}
+        sed -e "${_nb_item} ${_mode} ${_new_item}" "${TODO_FILE}" > \
+             "${TMP_FILE}"
+        mv "${TMP_FILE}" "${TODO_FILE}"
     else
-        echo "${_new_item}" > ${TODO_FILE}
+        echo "${_new_item}" > "${TODO_FILE}"
     fi
 }
 
@@ -103,6 +108,17 @@ todo_list() {
     echo ""
 }
 
+todo_next_list() {
+    echo " .
+..: TODO
+======================================================================="
+    nl -n rz -b a ${TODO_FILE}
+}
+
+todo_no_list() {
+    cat ${TODO_FILE}
+}
+
 todo_loop() {
     while true; do
         clear
@@ -112,25 +128,29 @@ todo_loop() {
 }
 
 usage() {
-    echo "usage: todo [-achlPs] [-d line_number] [-e line_number] \
-[ -i line_number]"
+    echo "\
+usage: todo [-aclnPsx] [-d line_number] [-e line_number] [-f todo_file]
+            [-i line_number]"
     exit 1
 }
 
 [ -f "${TODO_FILE}" ] || touch ${TODO_FILE}
-while getopts "acd:e:hi:lPs" _opt; do
+[ $# -gt 0 ] || todo_list
+while getopts "acd:e:f:i:lnPsx" _opt; do
     case ${_opt} in
         a) item_append ;;
         c) clear && todo_list ;;
         d) item_delete ;;
         e) item_edit ;;
+        f) TODO_FILE="${OPTARG}" ;;
         i) item_insert ;;
         l) todo_loop ;;
+        n) todo_no_list ;;
         P) item_purge ;;
         s) todo_list ;;
+        x) todo_next_list ;;
         *) usage ;;
     esac
 done
-[ ${#} -eq 0 ] && todo_list
 
 exit 0
