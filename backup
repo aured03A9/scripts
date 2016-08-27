@@ -1,0 +1,190 @@
+#!/bin/sh
+#
+# Copyright (c) 2016 aured <aured+prj@openmailbox.org>
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+DATE_FILE=".lastsync"
+SYNC_DIR="<directory_to_sync>"
+LOCAL_DIR="${HOME}/${SYNC_DIR}"
+MOUNT_POINT="/run/media/${USER}"
+MASTER="<name_mountpoint_master_device>"
+SLAVES="
+<name_mountpoint_slave_device>
+<name_mountpoint_slave_device>
+<name_mountpoint_slave_device>
+"
+
+msg_act() {
+    echo "===> $*"
+}
+
+msg_err() {
+    echo "!!! $*"
+    exit 1
+}
+
+msg_ret() {
+    echo "-> $*"
+}
+
+backup_dir() {
+    echo -n "Backup of '${SYNC_DIR}'? [no] "
+    read _answer
+    case ${_answer} in
+        y|yes)
+            cd "$(dirname ${LOCAL_DIR})"
+            tar cpzvf "${SYNC_DIR}.tar.gz" "${SYNC_DIR}"
+            ;;
+    esac
+}
+
+check_date() {
+    local _lo=$1 _re=$2 _di=$3
+
+    msg_act "Check last sync for ${_di}"
+    echo "Local:  ${local_file}"
+    echo "Remote: ${remote_file}"
+    if [ ${_lo} -gt ${_re} ]; then
+        msg_ret "Need to sync"
+        need_sync=1
+    elif [ ${_lo} -lt ${_re} ]; then
+        msg_ret "Need to sync"
+        need_sync=2
+    elif [ ${_lo} -eq ${_re} ]; then
+        msg_ret "Nothing to do"
+        need_sync=0
+    else
+        msg_ret "Need to sync"
+        need_sync=1
+    fi
+}
+
+check_last_sync() {
+    local _disk _disks="$*"
+
+    find_last_sync "${LOCAL_DIR}"
+    local_file=$(cat ${LOCAL_DIR}/${DATE_FILE})
+    for _disk in ${_disks}; do
+        if [ "$(check_mount ${_disk})" ]; then
+            remote_dir="${MOUNT_POINT}/${_disk}/${SYNC_DIR}" 
+            remote_file="${remote_dir}/${DATE_FILE}"
+            file_exist "${remote_file}"
+            remote_file=$(cat ${remote_file})
+            check_date "${local_file}" "${remote_file}" "${_disk}"
+        fi
+    done
+}
+
+check_mount() {
+    mount | grep $1
+}
+
+file_exist() {
+    local _file=$1
+
+    [ -z "${_file}" -o ! -f "${_file}" ] && echo 0 > "${_file}"
+}
+
+find_last_sync() {
+    find "$1" -type f ! -path "*${DATE_FILE}" -printf '%TY%Tm%Td%TH%TM%TS\n' | \
+        sort -n | tail -n 1 | cut -d'.' -f 1 > "$1/${DATE_FILE}"
+}
+
+sync_cmd() {
+    local _src=$1 _dst=$2
+
+    echo "Source: ${_src}"
+    echo "Target: ${_dst}"
+    echo -n "Are you ready? [no] "
+    read _answer
+    if [ "${_answer}" = "y" ] || [ "${_answer}" = "yes" ]; then
+        rsync -auh --progress --delete "${_src}/" "${_dst}/"
+    fi
+}
+
+sync_disk() {
+    local _disk _disks="$*"
+
+    find_last_sync "${LOCAL_DIR}"
+    local_file="$(cat ${LOCAL_DIR}/${DATE_FILE})"
+    for _disk in ${_disks}; do
+        if [ "$(check_mount ${_disk})" ]; then
+            remote_dir="${MOUNT_POINT}/${_disk}/${SYNC_DIR}"
+            remote_file="${remote_dir}/${DATE_FILE}"
+            file_exist "${remote_file}"
+            remote_file=$(cat ${remote_file})
+            check_date "${local_file}" "${remote_file}" "${_disk}"
+            if [ ${need_sync} -eq 1 ]; then
+                msg_act "Push ${SYNC_DIR} to ${_disk}"
+                sync_cmd "${LOCAL_DIR}" "${remote_dir}"
+            elif [ ${need_sync} -eq 2 ]; then
+                msg_act "Fetch ${SYNC_DIR} from ${_disk}"
+                backup_dir
+                sync_cmd "${remote_dir}" "${LOCAL_DIR}"
+            fi
+        fi
+    done
+}
+
+sync_master_to_slave() {
+    local _disk _master_dir _slave_dir
+
+    if [ "$(check_mount ${MASTER})" ]; then
+        _master_dir="${MOUNT_POINT}/${MASTER}"
+        for _disk in ${SLAVES}; do
+            if [ "$(check_mount ${_disk})" ]; then
+                _slave_dir="${MOUNT_POINT}/${_disk}"
+                msg_act "Sync '${MASTER}' to '${_disk}'"
+                sync_cmd "${_master_dir}" "${_slave_dir}"
+            fi
+        done
+    else
+        msg_err "'${MASTER}' is not mounted"
+        exit 1
+    fi
+}
+
+usage() {
+    echo "usage: backup [-bcsS] [-F source target]"
+}
+
+[ $# -gt 0 ] || usage
+while getopts "bcFsS" _opt; do
+    case ${_opt} in
+        b)
+            backup_dir
+            ;;
+        c)
+            check_last_sync ${MASTER}
+            check_last_sync ${SLAVES}
+            ;;
+        F)
+            shift $((OPTIND-1))
+            sync_cmd "$1" "$2"
+            ;;
+        s)
+            sync_disk ${MASTER}
+            sync_disk ${SLAVES}
+            ;;
+        S)
+            sync_master_to_slave
+            ;;
+        *) 
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+exit 0
