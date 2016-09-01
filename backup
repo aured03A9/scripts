@@ -18,11 +18,11 @@ DATE_FILE=".lastsync"
 SYNC_DIR="<directory_to_sync>"
 LOCAL_DIR="${HOME}/${SYNC_DIR}"
 MOUNT_POINT="/run/media/${USER}"
-MASTER="<name_mountpoint_master_device>"
+MASTER="<name_master_device>"
 SLAVES="
-<name_mountpoint_slave_device>
-<name_mountpoint_slave_device>
-<name_mountpoint_slave_device>
+<name_slave_device>
+<name_slave_device>
+<name_slave_device>
 "
 
 msg_act() {
@@ -39,7 +39,8 @@ msg_ret() {
 }
 
 backup_dir() {
-    echo -n "Backup of '${SYNC_DIR}'? [no] "
+    msg_act "Backup of ${LOCAL_DIR}"
+    echo -n "Are you sure? [no] "
     read _answer
     case ${_answer} in
         y|yes)
@@ -70,6 +71,15 @@ check_date() {
     fi
 }
 
+check_empty() {
+    local _path=$1
+
+    if [ ! -f "${_path}" -a ! -d "${_path}" ]; then
+        msg_err "Wrong path for '${_path}'"
+        exit 1
+    fi
+}
+
 check_last_sync() {
     local _disk _disks="$*"
 
@@ -88,6 +98,7 @@ check_last_sync() {
 
 check_mount() {
     mount | grep $1
+    #grep "$1" /proc/mounts
 }
 
 file_exist() {
@@ -104,6 +115,8 @@ find_last_sync() {
 sync_cmd() {
     local _src=$1 _dst=$2
 
+    check_empty "${_src}"
+    check_empty "${_dst}"
     echo "Source: ${_src}"
     echo "Target: ${_dst}"
     echo -n "Are you ready? [no] "
@@ -129,8 +142,8 @@ sync_disk() {
                 msg_act "Push ${SYNC_DIR} to ${_disk}"
                 sync_cmd "${LOCAL_DIR}" "${remote_dir}"
             elif [ ${need_sync} -eq 2 ]; then
-                msg_act "Fetch ${SYNC_DIR} from ${_disk}"
                 backup_dir
+                msg_act "Fetch ${SYNC_DIR} from ${_disk}"
                 sync_cmd "${remote_dir}" "${LOCAL_DIR}"
             fi
         fi
@@ -145,12 +158,12 @@ sync_master_to_slave() {
         for _disk in ${SLAVES}; do
             if [ "$(check_mount ${_disk})" ]; then
                 _slave_dir="${MOUNT_POINT}/${_disk}"
-                msg_act "Sync '${MASTER}' to '${_disk}'"
+                msg_act "Sync ${MASTER} to ${_disk}"
                 sync_cmd "${_master_dir}" "${_slave_dir}"
             fi
         done
     else
-        msg_err "'${MASTER}' is not mounted"
+        msg_err "${MASTER} is not mounted"
         exit 1
     fi
 }
