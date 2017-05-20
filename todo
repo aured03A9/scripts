@@ -101,23 +101,30 @@ item_write() {
 }
 
 todo_list() {
-    echo ""
-    echo "                    TODO"
-    echo "      <<---------------------------->>"
-    echo ""
-    nl -b a ${TODO_FILE}
-    echo ""
-}
+    : ${STYLE:=$OPTARG}
 
-todo_next_list() {
-    echo " .
-..: TODO
-======================================================================="
-    nl -n rz -b a ${TODO_FILE}
-}
-
-todo_no_list() {
-    cat ${TODO_FILE}
+    case ${STYLE} in
+        0)
+            cat ${TODO_FILE}
+            ;;
+        1)
+            echo " ."
+            echo "..: TODO"
+            echo "======================================================================="
+            nl -s' >> ' -w 4 -n rz -b a ${TODO_FILE}
+            ;;
+        2)
+            nl -s'. ' -w 1 -b a ${TODO_FILE}
+            ;;
+        *)
+            echo ""
+            echo "                    TODO"
+            echo "      <<---------------------------->>"
+            echo ""
+            nl -b a ${TODO_FILE}
+            echo ""
+            ;;
+    esac
 }
 
 todo_loop() {
@@ -130,14 +137,14 @@ todo_loop() {
 
 usage() {
     echo "\
-usage: todo [-aclnPsx] [-d line_number] [-e line_number] [-f todo_file]
-            [-i line_number]"
+usage: todo [-achlnPx] [-d line_number] [-e line_number] [-f todo_file]
+            [-i line_number] [-s style_number]"
     exit 1
 }
 
 [ -f "${TODO_FILE}" ] || touch ${TODO_FILE}
 [ $# -gt 0 ] || todo_list
-while getopts "acd:e:f:i:lnPsx" _opt; do
+while getopts "acd:e:f:hi:lnPs:x" _opt; do
     case ${_opt} in
         a) item_append ;;
         c) clear && todo_list ;;
@@ -146,10 +153,10 @@ while getopts "acd:e:f:i:lnPsx" _opt; do
         f) TODO_FILE="${OPTARG}" ;;
         i) item_insert ;;
         l) todo_loop ;;
-        n) todo_no_list ;;
+        n) STYLE=0 && todo_list ;;
         P) item_purge ;;
         s) todo_list ;;
-        x) todo_next_list ;;
+        x) STYLE=1 && todo_list ;;
         *) usage ;;
     esac
 done
