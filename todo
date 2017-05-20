@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2016 aured <aured+prj@openmailbox.org>
+# Copyright (c) 2016, 2017 aured <aured+prj@protonmail.com>
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -93,7 +93,8 @@ item_write() {
     if [ -s "${TODO_FILE}" ]; then
         sed -e "${_nb_item} ${_mode} ${_new_item}" "${TODO_FILE}" > \
              "${TMP_FILE}"
-        mv "${TMP_FILE}" "${TODO_FILE}"
+        cat "${TMP_FILE}" > "${TODO_FILE}"
+        rm "${TMP_FILE}"
     else
         echo "${_new_item}" > "${TODO_FILE}"
     fi
