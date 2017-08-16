@@ -15,35 +15,40 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 TODO_FILE="$HOME/.todo"
-TMP_FILE="/tmp/todofile"
+TMP_FILE="/tmp/$(basename ${TODO_FILE}).tmp"
 INTERVAL=10
+STYLE=-1
 
 item_append() {
+    local _nb _mode
+    _nb='$'
     _mode='a'
-    _nb_item='$'
-    item_new
-    item_write
+
+    item_new "${_nb}" "${_mode}"
 }
 
 item_delete() {
+    local _nb _mode _answer
+    _nb=$1
     _mode='d'
-    item_view
-    echo "${_nb_item}  ${_item}"
-    echo -n "Remove item ${_nb_item}? [no] "
-    read _answer
+
+    item_view "${_nb}" "${TODO_FILE}"
+    echo -n "Remove it? [no] "
+    read -r _answer
     case ${_answer} in
         y|yes)
-            item_write
+            item_write "${_nb}" "${_mode}" "" "${TODO_FILE}" "${TMP_FILE}"
             ;;
     esac
 }
 
 item_edit() {
+    local _nb _mode
+    _nb=$1
     _mode='c'
-    item_view
-    echo "Old item: ${_item}"
-    item_new
-    item_write
+
+    item_view "${_nb}" "${TODO_FILE}"
+    item_new "${_nb}" "${_mode}"
 }
 
 item_empty() {
@@ -51,21 +56,30 @@ item_empty() {
 }
 
 item_insert() {
+    local _nb _mode
+    _nb=$1
     _mode='i'
-    item_number
-    item_new
-    item_write
+
+    item_number "${_nb}"
+    item_new "${_nb}" "${_mode}"
 }
 
 item_new() {
+    local _nb _mode _new_item
+    _nb=$1
+    _mode=$2
+
     echo -n "New item: "
-    read _new_item
+    read -r _new_item
     item_empty "${_new_item}"
+    item_write "${_nb}" "${_mode}" "${_new_item}" "${TODO_FILE}" "${TMP_FILE}"
 }
 
 item_number() {
-    _nb_item=${OPTARG}
-    case ${_nb_item} in
+    local _nb
+    _nb=$1
+
+    case ${_nb} in
         ''|*[!0-9]*)
             exit 1
             ;;
@@ -73,55 +87,72 @@ item_number() {
 }
 
 item_purge() {
+    local _todo_file _answer
+    _todo_file=$1
+
     echo -n "Purge todo file? [no] "
-    read _answer
+    read -r _answer
     case ${_answer} in
         y|yes)
-            : > ${TODO_FILE}
+            : > "${_todo_file}"
             echo "Todo file purged!"
             ;;
     esac
 }
 
 item_view() {
-    item_number
-    _item=$(sed -n "${_nb_item}p" ${TODO_FILE})
+    local _nb _todo_file _item
+    _nb=$1
+    _todo_file=$2
+
+    item_number "${_nb}"
+    _item=$(sed -n "${_nb}p" "${_todo_file}")
     item_empty "${_item}"
+    echo "Item ${_nb}: ${_item}"
 }
 
 item_write() {
-    if [ -s "${TODO_FILE}" ]; then
-        sed -e "${_nb_item} ${_mode} ${_new_item}" "${TODO_FILE}" > \
-             "${TMP_FILE}"
-        cat "${TMP_FILE}" > "${TODO_FILE}"
-        rm "${TMP_FILE}"
+    local _nb _mode _new_item _todo_file _tmp_file
+    _nb=$1
+    _mode=$2
+    _new_item=$3
+    _todo_file=$4
+    _tmp_file=$5
+
+    if [ -s "${_todo_file}" ]; then
+        sed -e "${_nb} ${_mode} ${_new_item}" "${_todo_file}" > \
+             "${_tmp_file}"
+        cat "${_tmp_file}" > "${_todo_file}"
+        rm "${_tmp_file}"
     else
-        echo "${_new_item}" > "${TODO_FILE}"
+        echo "${_new_item}" > "${_todo_file}"
     fi
 }
 
 todo_list() {
-    : ${STYLE:=$OPTARG}
+    local _style _todo_file
+    _style=$1
+    _todo_file=$2
 
-    case ${STYLE} in
+    case ${_style} in
         0)
-            cat ${TODO_FILE}
+            cat "${_todo_file}"
             ;;
         1)
             echo " ."
             echo "..: TODO"
             echo "======================================================================="
-            nl -s' >> ' -w 4 -n rz -b a ${TODO_FILE}
+            nl -s' >> ' -w 4 -n rz -b a "${_todo_file}"
             ;;
         2)
-            nl -s'. ' -w 1 -b a ${TODO_FILE}
+            nl -s'. ' -w 1 -b a "${_todo_file}"
             ;;
         *)
             echo ""
             echo "                    TODO"
             echo "      <<---------------------------->>"
             echo ""
-            nl -b a ${TODO_FILE}
+            nl -b a "${_todo_file}"
             echo ""
             ;;
     esac
@@ -130,35 +161,40 @@ todo_list() {
 todo_loop() {
     while true; do
         clear
-        todo_list
+        todo_list "${STYLE}" "${TODO_FILE}"
         sleep ${INTERVAL}
     done
 }
 
 usage() {
     echo "\
-usage: todo [-achlnPx] [-d line_number] [-e line_number] [-f todo_file]
-            [-i line_number] [-s style_number]"
+usage: todo [-ahlP] [-f todo_file] [-s style_number] [-d|-e|-i line_number]"
     exit 1
 }
 
-[ -f "${TODO_FILE}" ] || touch ${TODO_FILE}
-[ $# -gt 0 ] || todo_list
-while getopts "acd:e:f:hi:lnPs:x" _opt; do
+[ -f "${TODO_FILE}" ] || touch "${TODO_FILE}"
+while getopts "ad:e:f:hi:lPs:" _opt; do
     case ${_opt} in
-        a) item_append ;;
-        c) clear && todo_list ;;
-        d) item_delete ;;
-        e) item_edit ;;
+        a) action="append" ;;
+        d) action="delete" && nb_item="${OPTARG}" ;;
+        e) action="edit" && nb_item="${OPTARG}" ;;
         f) TODO_FILE="${OPTARG}" ;;
-        i) item_insert ;;
-        l) todo_loop ;;
-        n) STYLE=0 && todo_list ;;
-        P) item_purge ;;
-        s) todo_list ;;
-        x) STYLE=1 && todo_list ;;
+        i) action="insert" && nb_item="${OPTARG}" ;;
+        l) action="loop" ;;
+        P) action="purge" ;;
+        s) STYLE="${OPTARG}" ;;
         *) usage ;;
     esac
 done
+
+case ${action} in
+    append) item_append ;;
+    delete) item_delete "${nb_item}" ;;
+    edit) item_edit "${nb_item}" ;;
+    insert) item_insert "${nb_item}" ;;
+    loop) todo_loop ;;
+    purge) item_purge "${TODO_FILE}" ;;
+    *) todo_list "${STYLE}" "${TODO_FILE}" ;;
+esac
 
 exit 0
