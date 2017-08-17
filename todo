@@ -80,7 +80,7 @@ item_number() {
     _nb=$1
 
     case ${_nb} in
-        ''|*[!0-9]*)
+        ''|*[!1-9]*)
             exit 1
             ;;
     esac
