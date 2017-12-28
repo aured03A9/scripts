@@ -78,7 +78,13 @@ item_move() {
 
     _mode='d'
     item_write "${_nb}" "${_mode}" "" "${TODO_FILE}" "${TMP_FILE}"
-    _mode='i'
+
+    if [ ${_nb} -gt ${_new_nb} ]; then
+        _mode='i'
+    else
+        _mode='a'
+        _new_nb=$((${_new_nb}-1))
+    fi
     item_write "${_new_nb}" "${_mode}" "${_item}" "${TODO_FILE}" "${TMP_FILE}"
 }
 
