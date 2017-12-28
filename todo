@@ -190,7 +190,6 @@ usage: todo [-ahlP] [-f todo_file] [-s style_number] [-d|-e|-i|-m line_number]"
     exit 1
 }
 
-[ -f "${TODO_FILE}" ] || touch "${TODO_FILE}"
 while getopts "ad:e:f:hi:lm:Ps:" _opt; do
     case ${_opt} in
         a) action="append" ;;
@@ -206,6 +205,7 @@ while getopts "ad:e:f:hi:lm:Ps:" _opt; do
     esac
 done
 
+[ -f "${TODO_FILE}" ] || touch "${TODO_FILE}"
 case ${action} in
     append) item_append ;;
     delete) item_delete "${nb_item}" ;;
