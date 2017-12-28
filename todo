@@ -94,12 +94,16 @@ item_new() {
 }
 
 item_number() {
-    local _nb
+    local _nb _nb_line
     _nb=$1
 
     case ${_nb} in
-        ''|*[!1-9]*)
+        ''|*[!0-9]*)
             exit 1
+            ;;
+        *)
+            _nb_line=$(wc -l "${TODO_FILE}" | cut -d' ' -f1)
+            ([ ${_nb} -eq 0 ] || [ ${_nb} -gt ${_nb_line} ]) && exit 1
             ;;
     esac
 }
